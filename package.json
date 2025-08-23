@@ -2,19 +2,53 @@
   "name": "typhoon-sdk",
   "version": "1.0.0",
   "description": "sdk for typhoon integration",
-  "main": "index.js",
-  "type": "module",
+  "main": "dist/typhoon-sdk.js",
+  "module": "dist/typhoon-sdk.js",
+ 
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "rollup -c"
   },
   "author": "esdras-santos",
   "license": "ISC",
+  "exports": {
+    ".": {
+      "require": "./dist/typhoon-sdk.cjs.js",
+      "import": "./dist/typhoon-sdk.esm.js",
+      "browser": "./dist/typhoon-sdk.umd.js"
+    }
+  },
   "dependencies": {
+    "@rollup/plugin-replace": "^6.0.2",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-wasm": "^6.2.2",
     "axios": "^1.11.0",
+    "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",
+    "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "garaga": "0.18.1",
+    "rollup-plugin-polyfill-node": "^0.13.0",
     "snarkjs": "^0.7.5",
-    "starknet": "^7.6.4"
-  }
+    "starknet": "^7.6.4",
+    "typescript": "^5.9.2"
+  },
+  "browser": {
+    "crypto": "crypto-browserify"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@types/node": "^24.3.0",
+    "rollup": "^4.47.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typhoonmixer/typhoon_sdk.git"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/typhoonmixer/typhoon_sdk/issues"
+  },
+  "homepage": "https://github.com/typhoonmixer/typhoon_sdk#readme"
 }

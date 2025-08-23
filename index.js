@@ -1,20 +1,23 @@
 
 import { RpcProvider, Contract, constants, types, hash, events, CallData, num, cairo } from 'starknet';
 import { ethers } from 'ethers'
-import Hasher from './mimc5';
+import Hasher from './mimc5.js';
 import * as garaga from 'garaga';
-import vk from './verification_key.json' assert { type: "json" }
-import { parseGroth16ProofFromObject, parseGroth16VerifyingKeyFromObject } from './parsingUtils';
+import { vk } from './verification_key.js';
+import * as parser from './parsingUtils.cjs';
 import * as snarkjs from "snarkjs";
 import axios from 'axios';
+import * as wc from './witness_calculator.cjs';
+
+
 
 const provider = new RpcProvider({ nodeUrl: "https://starknet-sepolia.public.blastapi.io/rpc/v0_8" });
-const typhoonAddress = ""
-const PAYMASTER_ADDR = ""
+const typhoonAddress = "0x453bd4d747ea353bfb708952847f2b1aa1d8a17aa0ecd38cfce85d9fda69ecb"
+const PAYMASTER_ADDR = "0x014c78b080b3e8b9d56ea74f05acdd9de473894998319761619eec15d415fa0a"
 
-const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
 
-export class Typhoon {
+
+export class TyphoonSDK {
 
     constructor(secrets = [], nullifiers = [], pools = []) {
         this.secrets = secrets
@@ -74,6 +77,7 @@ export class Typhoon {
 
     async generate_approve_and_deposit_calls(amount, token_address) {
         let [allowPerPool, poolToDenomination, pools] = await allowancePerPool(amount, token_address)
+
         let approvalsAndDeposit = []
         let approvals = []
         let deposits = []
@@ -84,10 +88,10 @@ export class Typhoon {
                     entrypoint: 'approve',
                     calldata: CallData.compile({
                         spender: "0x" + pools[i].toString(16),
-                        amount: cairo.uint256(allowPerPool[pools[i]]),
+                        amount: cairo.uint256(allowPerPool["0x" + pools[i].toString(16)]),
                     }),
                 })
-                for (let j = 0; j < allowPerPool["0x" + pools[i].toString(16)] / poolToDenomination["0x" + pools[i].toString(16)]; i++) {
+                for (let j = 0n; j < allowPerPool["0x" + pools[i].toString(16)] / poolToDenomination["0x" + pools[i].toString(16)]; j += 1n) {
                     const [secret, nullifier] = generateSecretAndNullifier()
                     this.secrets.push(secret)
                     this.nullifiers.push(nullifier)
@@ -97,7 +101,7 @@ export class Typhoon {
                         contractAddress: typhoonAddress,
                         entrypoint: 'deposit',
                         calldata: CallData.compile({
-                            _commitment: commitment,
+                            _commitment: cairo.uint256(commitment),
                             _pool: "0x" + pools[i].toString(16),
                             _reward: false
                         }),
@@ -129,7 +133,7 @@ export class Typhoon {
 
 async function generateProofCalldata(note, recipient) {
     await garaga.init();
-
+    const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
     const typhoon = new Contract(typhoonAbi, typhoonAddress, provider);
 
     let receipt = await provider.waitForTransaction(note.txHash)
@@ -137,9 +141,9 @@ async function generateProofCalldata(note, recipient) {
     let [commitment, nullifierHash] = await commitmentAndNullifierHash(note.secret, note.nullifier)
 
     let depositEvent = {}
-    for(let i = 0; i < typhoon.parseEvents(receipt).length; i++){
+    for (let i = 0; i < typhoon.parseEvents(receipt).length; i++) {
         let event = typhoon.parseEvents(receipt)[i]["typhoon::Typhoon::Typhoon::Deposit"]
-        if(event.commitments == commitment){
+        if (event.commitments == commitment) {
             depositEvent = event
             break
         }
@@ -177,9 +181,9 @@ async function generateProofCalldata(note, recipient) {
     }
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(proofInput, "withdraw.wasm", "withdraw_0001.zkey");
 
-    let parsedProof = parseGroth16ProofFromObject(proof, publicSignals.map(x => BigInt(x)))
+    let parsedProof = parser.parseGroth16ProofFromObject(proof, publicSignals.map(x => BigInt(x)))
 
-    let parsedVK = parseGroth16VerifyingKeyFromObject(vk)
+    let parsedVK = parser.parseGroth16VerifyingKeyFromObject(vk)
     const groth16Calldata = garaga.getGroth16CallData(parsedProof, parsedVK, garaga.CurveId.BN254);
 
     // The first element of the calldata is "length" and is not compatible with Cairo 1.0, so it is removed
@@ -205,7 +209,6 @@ async function fetchLevel(block_number, level, lvFullIndex, pool) {
 
     let levelArr = []
     let ll = lvFullIndex % 4n
-    console.log(filteredEvents)
     for (let i = 0; i < Number(ll.toString()); i++) {
         levelArr[i] = filteredEvents[(filteredEvents.length - 1) - i].value
     }
@@ -347,9 +350,10 @@ async function getCandRl(leafs, addEvents, pool, block_number) {
 async function allowancePerPool(amount, token_address) {
     let [poolsDenominations, denominationToPool, poolToDenomination, pools] = await getPoolsDenomination(token_address)
     poolsDenominations.sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+
     let poolsAllowance = {}
     let res = amount
-    for (let i = 0; i < poolsDenominations; i++) {
+    for (let i = 0; i < poolsDenominations.length; i++) {
         let aux = 0n
         if (res >= poolsDenominations[i]) {
             aux = res % poolsDenominations[i]
@@ -362,6 +366,7 @@ async function allowancePerPool(amount, token_address) {
 }
 
 async function getPoolsDenomination(token_address) {
+    const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
     const typhoon = new Contract(typhoonAbi, typhoonAddress, provider);
     const pools = await typhoon.getTokensByPool(token_address)
     let poolsDenominations = []
@@ -382,10 +387,20 @@ export async function commitmentAndNullifierHash(secret, nullifier) {
         secret: BigInt(secret),
         nullifier: BigInt(nullifier)
     };
-    var res = await fetch("deposit.wasm");
-    var buffer = await res.arrayBuffer();
+    let buffer;
+    if (typeof window === "undefined") {
+        const fs = require('fs/promises');
+        const path = require('path');
+        const wasmPath = path.resolve('./deposit.wasm');
 
-    var depositWC = await wc(buffer);
+        // Read the file as a buffer
+        buffer = await fs.readFile(wasmPath);
+    } else {
+        var res = await fetch("deposit.wasm");
+        buffer = await res.arrayBuffer();
+    }
+
+    var depositWC = await wc.default(buffer);
 
     const r = await depositWC.calculateWitness(input, 0);
 
