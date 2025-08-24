@@ -10,20 +10,18 @@ import axios from 'axios';
 import * as wc from './witness_calculator.cjs';
 
 
-
-const provider = new RpcProvider({ nodeUrl: "https://starknet-sepolia.public.blastapi.io/rpc/v0_8" });
-const typhoonAddress = "0x453bd4d747ea353bfb708952847f2b1aa1d8a17aa0ecd38cfce85d9fda69ecb"
-const PAYMASTER_ADDR = "0x014c78b080b3e8b9d56ea74f05acdd9de473894998319761619eec15d415fa0a"
-
+const provider = new RpcProvider({ nodeUrl: "https://starknet-mainnet.public.blastapi.io/rpc/v0_8" });
+const typhoonAddress = "0x1f902d238fc1f371688b63323ca9c9eaac7a3f43eb6ef330377f60d0a9f9102"
+const PAYMASTER_ADDR = "0x03f2039a5c1742f8d90985eabaddf691090176511ebe9d3bcd042b1914918e64"
+const SDK_ADDRESS = "0x1d585985a5f0e75567e63cb7066397e977bcd94f97a9ef01e1dee8b2c564be2"
 
 
 export class TyphoonSDK {
 
-    constructor(secrets = [], nullifiers = [], pools = []) {
-        this.secrets = secrets
-        this.nullifiers = nullifiers
-        this.pools = pools
-        this.sdk_address = ""
+    constructor() {
+        this.secrets = []
+        this.nullifiers = []
+        this.pools = []
     }
 
     init(secrets, nullifiers, pools) {
@@ -31,6 +29,7 @@ export class TyphoonSDK {
         this.nullifiers = nullifiers
         this.pools = pools
     }
+
 
     get_secrets() {
         return this.secrets
@@ -52,16 +51,16 @@ export class TyphoonSDK {
         return this.pools
     }
 
-    set_secrets(new_pools) {
+    set_pools(new_pools) {
         this.pools = new_pools
     }
 
     async add_to_blacklist(caller_account, blacklisted_address) {
-        const { abi: sdkAbi } = await provider.getClassAt(this.sdk_address);
-        const sdk = new Contract(sdkAbi, this.sdk_address, provider)
+        const { abi: sdkAbi } = await provider.getClassAt(SDK_ADDRESS);
+        const sdk = new Contract(sdkAbi, SDK_ADDRESS, provider)
         const call = sdk.populate('add_to_blacklist', { blacklisted_address: blacklisted_address });
         const multiCall = await caller_account.execute({
-            contractAddress: this.sdk_address,
+            contractAddress: SDK_ADDRESS,
             entrypoint: 'add_to_blacklist',
             calldata: call.calldata,
         });
@@ -69,8 +68,8 @@ export class TyphoonSDK {
     }
 
     async is_blacklisted(account_address) {
-        const { abi: sdkAbi } = await provider.getClassAt(this.sdk_address);
-        const sdk = new Contract(sdkAbi, this.sdk_address, provider)
+        const { abi: sdkAbi } = await provider.getClassAt(SDK_ADDRESS);
+        const sdk = new Contract(sdkAbi, SDK_ADDRESS, provider)
         let is_blacklisted = await sdk.is_blacklisted(account_address)
         return is_blacklisted
     }
@@ -124,10 +123,13 @@ export class TyphoonSDK {
                     note_account_calldata: {}
                 });
                 console.log("Response:", res.data);
+                
             } catch (err) {
                 console.error("Error:", err.response?.data || err.message);
+                return false
             }
         }
+        return true
     }
 }
 

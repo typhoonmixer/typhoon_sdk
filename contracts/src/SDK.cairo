@@ -69,7 +69,7 @@ pub mod SDK {
         ) {
             let caller = get_caller_address();
             assert!(self.verified.read(caller), "is not an verified entity");
-            self.blacklisted.entry(blacklisted_address).write(true);
+            self.blacklisted.entry(blacklisted_address).write(blacklisted);
             let mut verified_name: Array<u8> = ArrayTrait::new();
             for i in 0..(self.verified_name_len.entry(caller).read()) {
                 verified_name.append(self.verified_name.entry(caller).entry(i).read())
@@ -83,28 +83,43 @@ pub mod SDK {
                     },
                 )
         }
-        fn is_blacklisted(self: @ContractState, account: ContractAddress, verified: bool) -> bool {
+        fn is_blacklisted(self: @ContractState, account: ContractAddress) -> bool {
             self.blacklisted.entry(account).read()
         }
         fn verify_account(
-            ref self: ContractState, account_to_verify: ContractAddress, protocol_name: Span<u8>,
+            ref self: ContractState,
+            account_to_verify: ContractAddress,
+            protocol_name: Span<u8>,
+            verified: bool,
         ) {
             assert!(get_caller_address() == self.owner.read(), "only owner");
             assert!(
                 account_to_verify != contract_address_const::<0>(),
                 "account to be verified cannot be zero",
             );
-            for i in 0..protocol_name.len() {
-                self.verified_name.entry(account_to_verify).entry(i.into()).write(*protocol_name[i])
+            if verified {
+                for i in 0..protocol_name.len() {
+                    self
+                        .verified_name
+                        .entry(account_to_verify)
+                        .entry(i.into())
+                        .write(*protocol_name[i])
+                }
+                self.verified_name_len.entry(account_to_verify).write(protocol_name.len().into());
+                self.verified.entry(account_to_verify).write(verified);
+                self
+                    .emit(
+                        Verified {
+                            verified_address: account_to_verify, timestamp: get_block_timestamp(),
+                        },
+                    );
+            } else {
+                for i in 0..self.verified_name_len.entry(account_to_verify).read() {
+                    self.verified_name.entry(account_to_verify).entry(i.into()).write(0);
+                }
+                self.verified_name_len.entry(account_to_verify).write(0);
+                self.verified.entry(account_to_verify).write(verified);
             }
-            self.verified_name_len.entry(account_to_verify).write(protocol_name.len().into());
-            self.verified.entry(account_to_verify).write(true);
-            self
-                .emit(
-                    Verified {
-                        verified_address: account_to_verify, timestamp: get_block_timestamp(),
-                    },
-                );
         }
         fn is_verified_account(self: @ContractState, account: ContractAddress) -> bool {
             self.verified.entry(account).read()

@@ -2,12 +2,14 @@
   "name": "typhoon-sdk",
   "version": "1.0.0",
   "description": "sdk for typhoon integration",
-  "main": "dist/typhoon-sdk.js",
-  "module": "dist/typhoon-sdk.js",
+  "main": "dist/typhoon-sdk.cjs.js",
+  "module": "dist/typhoon-sdk.esm.js",
  
   "scripts": {
     "build": "rollup -c"
   },
+  "type": "module",
+  "types": "dist/index.d.ts", 
   "author": "esdras-santos",
   "license": "ISC",
   "exports": {
@@ -24,7 +26,6 @@
     "axios": "^1.11.0",
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",
-    "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "garaga": "0.18.1",
     "rollup-plugin-polyfill-node": "^0.13.0",
@@ -33,9 +34,12 @@
     "typescript": "^5.9.2"
   },
   "browser": {
-    "crypto": "crypto-browserify"
+    "crypto": "crypto-browserify",
+    "fs": false,
+    "path": false
   },
   "devDependencies": {
+    "dotenv": "^17.2.1",
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.1",

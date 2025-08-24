@@ -7,3 +7,7 @@ edition = "2024_07"
 
 [dependencies]
 starknet = "2.11.4"
+
+[[target.starknet-contract]]
+sierra = true
+casm = true
