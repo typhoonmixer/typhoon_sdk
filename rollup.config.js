@@ -13,10 +13,12 @@ export default {
             file: 'dist/typhoon-sdk.cjs.js',
             format: 'cjs',   // Node.js
             exports: 'named',
+            inlineDynamicImports: true
         },
         {
             file: 'dist/typhoon-sdk.esm.js',
             format: 'esm',   // Modern bundlers / browsers
+            inlineDynamicImports: true
         },
         {
             file: 'dist/typhoon-sdk.browser.esm.js',
@@ -30,6 +32,7 @@ export default {
                 "process.browser": true, // define a flag for conditional code
                 'typeof window': '"object"',
             }),], // ✅ keep terser only here
+            inlineDynamicImports: true
         },
     ],
     external: [

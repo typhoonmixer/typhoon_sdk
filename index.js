@@ -123,7 +123,7 @@ export class TyphoonSDK {
                     note_account_calldata: {}
                 });
                 console.log("Response:", res.data);
-                
+
             } catch (err) {
                 console.error("Error:", err.response?.data || err.message);
                 return false
@@ -391,9 +391,11 @@ export async function commitmentAndNullifierHash(secret, nullifier) {
     };
     let buffer;
     if (typeof window === "undefined") {
-        const fs = require('fs/promises');
-        const path = require('path');
-        const wasmPath = path.resolve('./deposit.wasm');
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const { fileURLToPath } = await import('url');
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        const wasmPath = path.join(__dirname, 'deposit.wasm');
 
         // Read the file as a buffer
         buffer = await fs.readFile(wasmPath);
