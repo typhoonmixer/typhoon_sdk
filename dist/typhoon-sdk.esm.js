@@ -28036,7 +28036,8 @@ async function commitmentAndNullifierHash(secret, nullifier) {
         // Read the file as a buffer
         buffer = await fs.readFile(wasmPath);
     } else {
-        var res = await fetch("deposit.wasm");
+        const wasmUrl = new URL("./deposit.wasm", import.meta.url).href;
+        var res = await fetch(wasmUrl);
         buffer = await res.arrayBuffer();
     }
 

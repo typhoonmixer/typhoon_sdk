@@ -1,23 +1,31 @@
 {
   "name": "typhoon-sdk",
-  "version": "1.0.0",
+  "version": "1.0.39",
   "description": "sdk for typhoon integration",
   "main": "dist/typhoon-sdk.cjs.js",
   "module": "dist/typhoon-sdk.esm.js",
- 
   "scripts": {
     "build": "rollup -c"
   },
   "type": "module",
-  "types": "dist/index.d.ts", 
+  "types": "dist/index.d.ts",
   "author": "esdras-santos",
   "license": "ISC",
   "exports": {
     ".": {
+      "browser": "./dist/typhoon-sdk.browser.esm.js",
       "require": "./dist/typhoon-sdk.cjs.js",
-      "import": "./dist/typhoon-sdk.esm.js",
-      "browser": "./dist/typhoon-sdk.umd.js"
+      "import": "./dist/typhoon-sdk.esm.js"
     }
+  },
+  "browser": {
+    "./dist/typhoon-sdk.esm.js": "./dist/typhoon-sdk.browser.esm.js",
+    "crypto": "crypto-browserify",
+    "fs": false,
+    "fs/promises": false,
+    "path": false,
+    "url": false,
+    "module": false
   },
   "dependencies": {
     "@rollup/plugin-replace": "^6.0.2",

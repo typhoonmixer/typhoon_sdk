@@ -2,6 +2,7 @@
 
 var snarkjs = require('snarkjs');
 
+var _documentCurrentScript = typeof document !== 'undefined' ? document.currentScript : null;
 function _interopNamespaceDefault(e) {
     var n = Object.create(null);
     if (e) {
@@ -28057,7 +28058,8 @@ async function commitmentAndNullifierHash(secret, nullifier) {
         // Read the file as a buffer
         buffer = await fs.readFile(wasmPath);
     } else {
-        var res = await fetch("deposit.wasm");
+        const wasmUrl = new URL("./deposit.wasm", (typeof document === 'undefined' ? require('u' + 'rl').pathToFileURL(__filename).href : (_documentCurrentScript && _documentCurrentScript.tagName.toUpperCase() === 'SCRIPT' && _documentCurrentScript.src || new URL('typhoon-sdk.cjs.js', document.baseURI).href))).href;
+        var res = await fetch(wasmUrl);
         buffer = await res.arrayBuffer();
     }
 

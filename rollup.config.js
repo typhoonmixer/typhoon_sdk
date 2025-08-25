@@ -19,13 +19,17 @@ export default {
             format: 'esm',   // Modern bundlers / browsers
         },
         {
-            file: 'dist/typhoon-sdk.umd.js',
-            format: 'umd',   // Browser global
+            file: 'dist/typhoon-sdk.browser.esm.js',
+            format: 'esm',   // Browser global
             name: 'TyphoonSDK',
             globals: {
                 snarkjs: "snarkjs", // assumes window.snarkjs in browser
             },
-            plugins: [terser()], // ✅ keep terser only here
+            plugins: [terser(),  replace({
+                preventAssignment: true,
+                "process.browser": true, // define a flag for conditional code
+                'typeof window': '"object"',
+            }),], // ✅ keep terser only here
         },
     ],
     external: [
@@ -50,10 +54,7 @@ export default {
             maxFileSize: 10000000, // inline wasm up to 10MB
         }),
         nodePolyfills(),
-        replace({
-            preventAssignment: true,
-            "process.browser": true, // define a flag for conditional code
-        }),
+        
     ],
     context: "this", // ✅ ensures UMD uses globalThis/global instead of undefined
 };
