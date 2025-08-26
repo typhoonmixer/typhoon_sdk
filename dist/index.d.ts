@@ -29,6 +29,8 @@ declare module "typhoon-sdk" {
 
         generate_approve_and_deposit_calls(amount: BigInt, token_address: string): Promise<CallObject[]>;
 
+        get_withdraw_calldata(txhash: string, receiver_list: string[]): any[];
+
         withdraw(txHash: string, receiver_list: string[]): Promise<boolean>;
 
         is_blacklisted(account_address: string): Promise<boolean>;
