@@ -6,7 +6,7 @@ Read the [https://typhoon-2.gitbook.io/typhoon-docs](Documentation) for more inf
 
 ## Basic usage
 
-<pre> ```javascript 
+```javascript 
     import { TyphoonSDK } from 'typhoon-sdk'
 import { RpcProvider, Account } from 'starknet';
 
@@ -29,4 +29,4 @@ await account.waitForTransaction(multiCall.transaction_hash);
 // withdraw has two arguments the txhash of the deposit execution and a list of recipients 
 await sdk.withdraw(multiCall.transaction_hash, ['0xrecipientAddress']) 
 
- ``` </pre>
+ ```
