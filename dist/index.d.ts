@@ -25,6 +25,8 @@ declare module "typhoon-sdk" {
 
         init(secrets: string[], nullifiers: string[], pools: string[]): void;
 
+        get_token_minimal_amount(token_address: string): Promise<BigInt>
+
         generate_approve_and_deposit_calls(amount: BigInt, token_address: string): Promise<CallObject[]>;
 
         withdraw(txHash: string, receiver_list: string[]): Promise<boolean>;

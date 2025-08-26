@@ -27693,6 +27693,20 @@ class TyphoonSDK {
         this.pools = new_pools;
     }
 
+    async get_token_minimal_amount(token_address) {
+        const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
+        const typhoon = new Contract(typhoonAbi, typhoonAddress, provider);
+        const pools = await typhoon.getTokensByPool(token_address);
+        let poolsDenominations = [];
+
+        for (let i = 0; i < pools.length; i++) {
+            let denomination = await getPoolDenomination("0x" + pools[i].toString(16));
+            poolsDenominations[i] = denomination;
+        }
+        poolsDenominations.sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
+        return poolsDenominations[poolsDenominations.length - 1]
+    }
+
     async add_to_blacklist(caller_account, blacklisted_address) {
         const { abi: sdkAbi } = await provider.getClassAt(SDK_ADDRESS);
         const sdk = new Contract(sdkAbi, SDK_ADDRESS, provider);
@@ -27819,9 +27833,24 @@ async function generateProofCalldata(note, recipient) {
         "RL": RL,
         "C": C
     };
-    const { proof, publicSignals } = await snarkjs.groth16.fullProve(proofInput, "withdraw.wasm", "withdraw_0001.zkey");
 
-    let parsedProof = parsingUtilsExports.parseGroth16ProofFromObject(proof, publicSignals.map(x => BigInt(x)));
+    let parsedProof = {};
+    if (typeof window === "undefined") {
+        await import('fs/promises');
+        const path = await import('path');
+        const { fileURLToPath } = await Promise.resolve().then(function () { return _polyfillNode_url; });
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        const wasmPath = path.join(__dirname, 'withdraw.wasm');
+        const zkeyPath = path.join(__dirname, 'withdraw_0001.zkey');
+        const { proof, publicSignals } = await snarkjs.groth16.fullProve(proofInput, wasmPath, zkeyPath);
+        parsedProof = parsingUtilsExports.parseGroth16ProofFromObject(proof, publicSignals.map(x => BigInt(x)));
+    } else {
+        const wasmUrl = new URL("./withdraw.wasm", import.meta.url).href;
+        const zkeyUrl = new URL("./withdraw_0001.zkey", import.meta.url).href;
+        const { proof, publicSignals } = await snarkjs.groth16.fullProve(proofInput, wasmUrl, zkeyUrl);
+        parsedProof = parsingUtilsExports.parseGroth16ProofFromObject(proof, publicSignals.map(x => BigInt(x)));
+    }
+
 
     let parsedVK = parsingUtilsExports.parseGroth16VerifyingKeyFromObject(vk);
     const groth16Calldata = getGroth16CallData(parsedProof, parsedVK, CurveId.BN254);
@@ -28034,7 +28063,6 @@ async function commitmentAndNullifierHash(secret, nullifier) {
         const { fileURLToPath } = await Promise.resolve().then(function () { return _polyfillNode_url; });
         const __dirname = path.dirname(fileURLToPath(import.meta.url));
         const wasmPath = path.join(__dirname, 'deposit.wasm');
-
         // Read the file as a buffer
         buffer = await fs.readFile(wasmPath);
     } else {
