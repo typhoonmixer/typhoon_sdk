@@ -27786,6 +27786,17 @@ class TyphoonSDK {
         return approvalsAndDeposit
     }
 
+    async get_withdraw_calldata(txhash, receiver_list){
+        let withdraw_calls = [];
+        for (let i = 0; i < this.secrets.length; i++) {
+            let note = { "secret": this.secrets[i], "nullifier": this.nullifiers[i], "pool": this.pools[i], "txHash": txhash };
+            let callData = await generateProofCalldata(note, receiver_list[i % receiver_list.length]);
+            let cd = callData.map(x => x.toString());
+            withdraw_calls.push(cd);
+        }
+        return withdraw_calls
+    }
+
     async withdraw(txhash, receiver_list) {
         for (let i = 0; i < this.secrets.length; i++) {
             let note = { "secret": this.secrets[i], "nullifier": this.nullifiers[i], "pool": this.pools[i], "txHash": txhash };

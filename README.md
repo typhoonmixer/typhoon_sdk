@@ -2,7 +2,7 @@
 
 The Typhoon SDK is a developer toolkit that allows private payments on Starknet through Typhoon private pools. It provides simple and fast way to integrate (just plug an play), composable, with secure and proven features  that enable users and applications to send and receive payments without exposing sensitive transaction details on-chain.
 
-Read the [https://typhoon-2.gitbook.io/typhoon-docs](Documentation) for more informations.
+Read the [Documentation](https://typhoon-2.gitbook.io/typhoon-docs) for more informations.
 
 ## Basic usage
 
