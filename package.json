@@ -1,6 +1,6 @@
 {
   "name": "typhoon-sdk",
-  "version": "1.0.44",
+  "version": "1.1.1",
   "description": "sdk for typhoon integration",
   "main": "dist/typhoon-sdk.cjs.js",
   "module": "dist/typhoon-sdk.esm.js",

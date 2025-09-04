@@ -3,21 +3,28 @@
 import { AccountInterface } from "starknet";
 
 declare module "typhoon-sdk" {
-    export interface DepositOptions {
-        token: string;
-        amount: bigint;
-        recipient: string;
-    }
 
-    export interface WithdrawOptions {
-        txHash: string;
-        recipient: string;
-    }
+    
 
     export interface CallObject {
         contractAddress: string;
         entrypoint: string;
         calldata: any;
+    }
+
+    export interface ComplianceObject{
+        depositAmount: string,
+        depositDate: string,
+        depositTxHash: string,
+        from: string,
+        commitment: string,
+        withdrawAmount: string,
+        withdrawDate: string,
+        withdrawTxHash: string,
+        to: string,
+        nullifierHash: string,
+        fee: string,
+        paymasterFee: string
     }
 
     export class TyphoonSDK {
@@ -30,6 +37,14 @@ declare module "typhoon-sdk" {
         generate_approve_and_deposit_calls(amount: BigInt, token_address: string): Promise<CallObject[]>;
 
         get_withdraw_calldata(txhash: string, receiver_list: string[]): any[];
+
+        withdraw_fee_by_token(token_address: string): Promise<number>
+
+        get_compliance_data(secret, nullifier, txhash, pool): Promise<ComplianceObject>
+
+        download_notes(txhash: string): Promise<void>
+
+        // store_notes_onchain(secrets: string[], nullifiers: string[], pools: string[], txhash: string): Promise<BigInt>
 
         withdraw(txHash: string, receiver_list: string[]): Promise<boolean>;
 

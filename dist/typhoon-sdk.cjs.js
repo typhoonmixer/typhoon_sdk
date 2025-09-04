@@ -27670,7 +27670,8 @@ function requireWitness_calculator () {
 var witness_calculatorExports = requireWitness_calculator();
 var witness_calculator = /*@__PURE__*/getDefaultExportFromCjs(witness_calculatorExports);
 
-const provider = new RpcProvider2({ nodeUrl: "https://starknet-mainnet.public.blastapi.io/rpc/v0_8" });
+const RPC_URL = "https://rpc.starknet.lava.build:443";
+const provider = new RpcProvider2({ nodeUrl: RPC_URL });
 const typhoonAddress = "0x1f902d238fc1f371688b63323ca9c9eaac7a3f43eb6ef330377f60d0a9f9102";
 const PAYMASTER_ADDR = "0x03f2039a5c1742f8d90985eabaddf691090176511ebe9d3bcd042b1914918e64";
 const SDK_ADDRESS = "0x1d585985a5f0e75567e63cb7066397e977bcd94f97a9ef01e1dee8b2c564be2";
@@ -27713,6 +27714,107 @@ class TyphoonSDK {
 
     set_pools(new_pools) {
         this.pools = new_pools;
+    }
+
+    async withdraw_fee_by_token(token_address) {
+        const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
+        const typhoon = new Contract(typhoonAbi, typhoonAddress, provider);
+        const pools = await typhoon.getTokensByPool(token_address);
+        const { abi: poolAbi } = await provider.getClassAt("0x" + pools[0].toString(16));
+        const poolContract = new Contract(poolAbi, "0x" + pools[0].toString(16), provider);
+        let denomination = await poolContract.denomination();
+        let withdrawFee = await poolContract.withdrawFee();
+        let fee = (100 * Number(withdrawFee)) / Number(denomination);
+        return fee
+    }
+
+    async get_compliance_data(secret, nullifier, txhash, pool) {
+        const { abi: poolAbi } = await provider.getClassAt(pool);
+        const poolContract = new Contract(poolAbi, pool, provider);
+        let [commitment, nullifierHash] = await commitmentAndNullifierHash(secret, nullifier);
+        let isSpent = await poolContract.isSpent(nullifierHash);
+        let denomination = await poolContract.denomination();
+        const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
+        const typhoon = new Contract(typhoonAbi, typhoonAddress, provider);
+        let receipt = await provider.waitForTransaction(txhash);
+
+        let depositEvent = {};
+        for (let i = 0; i < typhoon.parseEvents(receipt).length; i++) {
+            let event = typhoon.parseEvents(receipt)[i]["typhoon::Typhoon::Typhoon::Deposit"];
+            if (event.commitments == commitment) {
+                depositEvent = event;
+                break
+            }
+        }
+        let tx = await provider.getTransactionByHash(txhash);
+
+        if (!isSpent) {
+            let ComplianceObject = {
+                depositAmount: denomination.toString(),
+                depositDate: depositEvent.timestamps.toString(),
+                depositTxHash: txhash,
+                from: tx.sender_address,
+                commitment: commitment.toString(),
+                withdrawAmount: '',
+                withdrawDate: '',
+                withdrawTxHash: '',
+                to: '',
+                nullifierHash: '',
+                fee: '',
+                paymasterFee: ''
+            };
+            return ComplianceObject
+        } else {
+            let [eventData, txHash] = await getWithdrawEvent(receipt.value.block_number, nullifierHash, pool);
+            let withdraw_receipt = await provider.waitForTransaction(txHash);
+            const block = await provider.getBlock(withdraw_receipt.value.block_hash);
+            let transferEvents = await getTransfers(txHash, pool);
+
+            let fee = denomination - (transferEvents[0].value + transferEvents[1].value);
+            let ComplianceObject = {
+                depositAmount: denomination.toString(),
+                depositDate: depositEvent.timestamps.toString(),
+                depositTxHash: txhash,
+                from: tx.sender_address,
+                commitment: '0x' + commitment.toString(16),
+                withdrawAmount: transferEvents[0].value.toString(),
+                withdrawDate: block.timestamp.toString(),
+                withdrawTxHash: txHash,
+                to: '0x' + BigInt(eventData.recipient).toString(16),
+                nullifierHash: '0x' + nullifierHash.toString(16),
+                fee: fee.toString(),
+                paymasterFee: transferEvents[1].value.toString()
+            };
+            return ComplianceObject
+        }
+    }
+
+    async download_notes(txhash) {
+        let proofsElements = [];
+        for (let i = 0; i < this.secrets.length; i++) {
+            proofsElements.push(
+                JSON.stringify({
+                    "secret": this.secrets[i],
+                    "nullifier": this.nullifiers[i],
+                    "txHash": txhash,
+                    "pool": this.pools[i],
+                    "day": '1'
+                })
+            );
+        }
+        if (typeof window === "undefined") {
+            const fs = await import('fs/promises');
+            // Write the JSON string to a file
+            await fs.writeFile('note.txt', proofsElements.join('\n'), 'utf8', (err) => {
+                if (err) {
+                    console.error('An error occurred while writing notes to File:', err);
+                } else {
+                    console.log('note file has been saved.');
+                }
+            });
+        } else {
+            createAndDownloadFile(proofsElements.join('\n'));
+        }
     }
 
     async get_token_minimal_amount(token_address) {
@@ -27786,7 +27888,7 @@ class TyphoonSDK {
         return approvalsAndDeposit
     }
 
-    async get_withdraw_calldata(txhash, receiver_list){
+    async get_withdraw_calldata(txhash, receiver_list) {
         let withdraw_calls = [];
         for (let i = 0; i < this.secrets.length; i++) {
             let note = { "secret": this.secrets[i], "nullifier": this.nullifiers[i], "pool": this.pools[i], "txHash": txhash };
@@ -27818,6 +27920,44 @@ class TyphoonSDK {
     }
 }
 
+async function getTransfers(txhash, pool) {
+    const { abi: poolAbi } = await provider.getClassAt(pool);
+    const poolc = new Contract(poolAbi, pool, provider);
+    const token = await poolc.token();
+    const { abi: tokenAbi } = await provider.getClassAt('0x' + token.toString(16));
+    const tokenc = new Contract(tokenAbi, '0x' + token.toString(16), provider);
+    let receipt = await provider.waitForTransaction(txhash);
+    let parsedEvents = tokenc.parseEvents(receipt);
+    let events = [];
+    for (let i = 0; i < parsedEvents.length; i++) {
+        if (parsedEvents[i]['src::strk::erc20_lockable::ERC20Lockable::Transfer'] != undefined) {
+            events.push(parsedEvents[i]['src::strk::erc20_lockable::ERC20Lockable::Transfer']);
+        }
+    }
+    events.pop();
+    return events
+}
+
+
+
+function createAndDownloadFile(content, name = "note.txt") {
+    const fileContent = content;
+    const blob = new Blob([fileContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+}
+
 async function generateProofCalldata(note, recipient) {
     await init$1();
     const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
@@ -27841,7 +27981,10 @@ async function generateProofCalldata(note, recipient) {
     let parsedAddEvents = await getAddEvents(Number(receipt.block_number), lastBlock.block_number, note.pool, keyFilter);
 
     let [C, RL, currentLevel, count] = await getCandRl(depositEvent.leafs, parsedAddEvents, note.pool, Number(receipt.block_number));
+
+
     let filteredleafs = depositEvent.leafs.filter(val => val != 0n);
+
     let D = getD(parsedAddEvents, depositEvent.d, filteredleafs[filteredleafs.length - 1]);
 
     let dd = getDD(D);
@@ -27892,6 +28035,39 @@ async function generateProofCalldata(note, recipient) {
     groth16Calldata[0] = note.pool;
 
     return groth16Calldata
+}
+
+async function getWithdrawEvent(from_block_number, nullifierHash, pool) {
+    const lastBlock = await provider.getBlock('latest');
+    const keyFilter = [[num_exports.toHex(hash_exports.starknetKeccak('Withdraw'))]];
+
+    let continuationToken = '0';
+    let withdrawEvent = [];
+    while (continuationToken != undefined) {
+        const eventsList = await provider.getEvents({
+            address: pool,
+            from_block: { block_number: from_block_number },
+            to_block: { block_number: lastBlock.block_number },
+            keys: keyFilter,
+            chunk_size: 1000,
+            continuation_token: continuationToken === '0' ? undefined : continuationToken,
+        });
+        continuationToken = eventsList.continuation_token;
+        for (let i = 0; i < eventsList.events.length; i++) {
+            let eventNullifierHash = BigInt(eventsList.events[i].data[1] + eventsList.events[i].data[0].slice(2));
+            if (nullifierHash == eventNullifierHash) {
+                withdrawEvent.push(eventsList.events[i]);
+                break;
+            }
+        }
+    }
+    const { abi: poolAbi } = await provider.getClassAt(pool);
+    const abiEvents = events_exports.getAbiEvents(poolAbi);
+    const abiStructs = CallData.getAbiStruct(poolAbi);
+    const abiEnums = CallData.getAbiEnum(poolAbi);
+    const parsed = events_exports.parseEvents(withdrawEvent, abiEvents, abiStructs, abiEnums);
+
+    return [parsed.map((e) => e["typhoon::Pool::Pool::Withdraw"])[0], withdrawEvent[0].transaction_hash]
 }
 
 async function getPoolDenomination(poolAddress) {
@@ -27986,19 +28162,19 @@ function hashListH2(input, len) {
     return h;
 }
 
+debugger;
 async function getCandRl(leafs, addEvents, pool, block_number) {
 
     let C = [];
     let RL = [];
     let leafLevel = [];
     let count = 0n;
-
     leafLevel = leafs.filter(val => val != 0n);
 
     let currentLevel = 0n;
     let currentLL = leafLevel.length;
 
-
+    debugger;
     RL = [...leafs];
     C.push([leafs[0], leafs[1], leafs[2], leafs[3]]);
     for (let i = 0; i < 125; i++) {
@@ -28018,8 +28194,24 @@ async function getCandRl(leafs, addEvents, pool, block_number) {
         if (addEvents[i].level == 0n) {
             count = addEvents[i].lvFullIndex;
         }
-        if (C[currentLevel][3] != 0n) {
+        if (C[currentLevel][3] != 0n && addEvents[i].level > currentLevel) {
             currentLevel += 1n;
+            C[currentLevel][addEvents[i].lvFullIndex % 4n] = addEvents[i].value;
+            let filteredEvents = addEvents.filter(val => val.level == currentLevel && val.lvFullIndex < addEvents[i].lvFullIndex);
+            let nonZeroIndex = addEvents[i].lvFullIndex;
+            for (let j = filteredEvents.length - 1; j > 0; j--) {
+                C[currentLevel][filteredEvents[j].lvFullIndex % 4n] = filteredEvents[j].value;
+                nonZeroIndex = filteredEvents[j].lvFullIndex;
+            }
+            if (C[currentLevel][0] == 0n) {
+                let previousRoots = await fetchLevel(block_number, currentLevel, nonZeroIndex, pool);
+
+                previousRoots.reverse();
+                for (let j = 0; j < previousRoots.length; j++) {
+                    C[currentLevel][j] = previousRoots[j];
+                }
+            }
+
         }
         if (addEvents[i].level == currentLevel) {
             let ll = addEvents[i].lvFullIndex % 4n;
@@ -28029,20 +28221,21 @@ async function getCandRl(leafs, addEvents, pool, block_number) {
             } else if (ll != 0n && C[currentLevel][ll - 1n] != 0n) {
                 C[currentLevel][ll] = addEvents[i].value;
                 RL = C[currentLevel];
-            } else {
+            } else if (C[currentLevel][0] == 0n) {
+
                 let previousRoots = await fetchLevel(block_number, addEvents[i].level, addEvents[i].lvFullIndex, pool);
+
                 if (!previousRoots.includes(addEvents[i].value)) {
                     previousRoots[ll] = addEvents[i].value;
-                }
 
+                }
                 RL = [0n, 0n, 0n, 0n];
                 for (let j = 0; j < previousRoots.length; j++) {
                     RL[j] = previousRoots[j];
                 }
-                C[currentLevel][0] = addEvents[i].value;
+                C[currentLevel] = previousRoots;
             }
         }
-
     }
 
     return [C, RL, currentLevel, count]
@@ -29303,4 +29496,3 @@ var _polyfillNode_url = /*#__PURE__*/Object.freeze({
 });
 
 exports.TyphoonSDK = TyphoonSDK;
-exports.commitmentAndNullifierHash = commitmentAndNullifierHash;
