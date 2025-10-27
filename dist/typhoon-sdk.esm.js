@@ -27654,6 +27654,45 @@ const typhoonAddress = "0x1f902d238fc1f371688b63323ca9c9eaac7a3f43eb6ef330377f60
 const PAYMASTER_ADDR = "0x03f2039a5c1742f8d90985eabaddf691090176511ebe9d3bcd042b1914918e64";
 const SDK_ADDRESS = "0x1d585985a5f0e75567e63cb7066397e977bcd94f97a9ef01e1dee8b2c564be2";
 
+const typedMessage = {
+    types: {
+        StarkNetDomain: [
+            { name: 'name', type: 'felt' },
+            { name: 'chainId', type: 'felt' },
+            { name: 'version', type: 'felt' },
+        ],
+        Message: [{ name: 'content', type: 'felt' }],
+    },
+    primaryType: 'Message',
+    domain: {
+        name: 'Typhoon',
+        chainId: 'SN_MAIN', // or 'SN_SEPOLIA' for testnet
+        version: '1',
+    },
+    message: {
+        content: 'Genesis Stealth Account 1',
+    },
+};
+
+const tokens = [
+    "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+     "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
+     "0x0719b5092403233201aa822ce928bd4b551d0cdb071a724edd7dc5e5f57b7f34",
+     "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac",
+     "0x04daa17763b286d1e59b97c283c0b8c949994c361e426a28f743c67bdfe9a32f",
+     "0x00acc2fa3bb7f6a6726c14d9e142d51fe3984dbfa32b5907e1e76425177875e2"
+];
+
+const tokenToSymbol = {
+     "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d": "STRK",
+     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7": "ETH",
+     "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8": "USDC",
+     "0x0719b5092403233201aa822ce928bd4b551d0cdb071a724edd7dc5e5f57b7f34": "UNO",
+     "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac": "WBTC",
+     "0x04daa17763b286d1e59b97c283c0b8c949994c361e426a28f743c67bdfe9a32f": "tBTC",
+     "0x00acc2fa3bb7f6a6726c14d9e142d51fe3984dbfa32b5907e1e76425177875e2": "SCHIZODIO"
+};
 
 class TyphoonSDK {
 
@@ -27692,6 +27731,10 @@ class TyphoonSDK {
 
     set_pools(new_pools) {
         this.pools = new_pools;
+    }
+
+    get_typedMessage() {
+        return typedMessage
     }
 
     async withdraw_fee_by_token(token_address) {
@@ -27877,6 +27920,8 @@ class TyphoonSDK {
         return withdraw_calls
     }
 
+
+
     async withdraw(txhash, receiver_list) {
         for (let i = 0; i < this.secrets.length; i++) {
             let note = { "secret": this.secrets[i], "nullifier": this.nullifiers[i], "pool": this.pools[i], "txHash": txhash };
@@ -27895,6 +27940,162 @@ class TyphoonSDK {
             }
         }
         return true
+    }
+
+    async withdraw_to_anonymous_account(txhash, lastAnonPrivKey, splited, address, accountid) {
+        let nextText = Array.from("next").map(char => char.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+        let receiverList = [];
+        let receiverPubKeyList = [];
+        let receiverPrivKeyList = [];
+        let curPrivKey = lastAnonPrivKey;
+        let curPubKey = ec_exports.starkCurve.getStarkKey(curPrivKey);
+        let argent_class_hash = "0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f";
+        let braavos_class_hash = "0x03d16c7a9a60b0593bd202f660a28c5d76e0403601d9ccc7e4fa253b6a70c201";
+        let class_hash = accountid == "argentX" ? argent_class_hash : braavos_class_hash;
+        console.log("class_hash ", class_hash);
+        //         argent id  argentX
+        // braavos id  braavos
+        if (splited) {
+
+            for (let i = 0; i < this.secrets.length; i++) {
+                receiverPubKeyList.push(curPubKey);
+                receiverPrivKeyList.push(curPrivKey);
+                let addr = "";
+                if (accountid == "argentX") {
+                    addr = hash_exports.calculateContractAddressFromHash(
+                        curPubKey,
+                        class_hash,
+                        ["0", curPubKey, "1"],
+                        "0x0"
+                    );
+                } else if (accountid == "braavos") {
+                    addr = hash_exports.calculateContractAddressFromHash(
+                        curPubKey,
+                        class_hash,
+                        [curPubKey],
+                        "0x0"
+                    );
+                }
+
+                console.log("addr ", addr);
+                receiverList.push(addr);
+                curPrivKey = hash_exports.computePoseidonHash(BigInt(curPrivKey), BigInt('0x' + nextText));
+                curPubKey = ec_exports.starkCurve.getStarkKey(curPrivKey);
+            }
+        } else {
+
+            receiverPubKeyList.push(curPubKey);
+            receiverPrivKeyList.push(curPrivKey);
+            let addr = "";
+            if (accountid == "argentX") {
+                addr = hash_exports.calculateContractAddressFromHash(
+                    curPubKey,
+                    class_hash,
+                    ["0", curPubKey, "1"],
+                    "0x0"
+                );
+            } else if (accountid == "braavos") {
+                addr = hash_exports.calculateContractAddressFromHash(
+                    curPubKey,
+                    class_hash,
+                    [curPubKey],
+                    "0x0"
+                );
+            }
+            
+            console.log("curPubKey ", curPubKey);
+            console.log("addr ", addr);
+            receiverList.push(addr);
+        }
+
+        for (let i = 0; i < this.secrets.length; i++) {
+            let note = { "secret": this.secrets[i], "nullifier": this.nullifiers[i], "pool": this.pools[i], "txHash": txhash };
+            let callData = [];
+            if (splited) {
+                callData = await generateProofCalldataForAnonymous(note, receiverList[i], receiverPubKeyList[i], receiverPrivKeyList[i], class_hash, accountid);
+            } else {
+                if (i == 0) {
+                    console.log("pubkey ", receiverPubKeyList[0]);
+                    callData = await generateProofCalldataForAnonymous(note, receiverList[0], receiverPubKeyList[0], receiverPrivKeyList[0], class_hash, accountid);
+                    console.log("classhash ", callData[3]);
+                } else {
+                    callData = await generateProofCalldataForAnonymous(note, receiverList[0], undefined, undefined, class_hash, accountid);
+                }
+            }
+            let cd = callData.map(x => x.toString());
+            // console.log("pk ", callData[2])
+            // calls.push(callData)
+            try {
+                const res = await axios.post("https://typhoon-paymaster.vercel.app/calldata", {
+                    calldata: cd,
+                    note_account_calldata: {}
+                });
+                console.log("Response:", res.data);
+
+            } catch (err) {
+                console.error("Error:", err.response?.data || err.message);
+                return false
+            }
+        }
+        return true
+    }
+
+    async get_valid_anonymous_accounts(genPrivKey, address, accountid) {
+        // let sig = await account.signMessage(typedMessage)
+        let nextText = Array.from("next").map(char => char.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+        let curPrivKey = genPrivKey;
+        let curPubKey = ec_exports.starkCurve.getStarkKey(curPrivKey);
+        let argent_class_hash = "0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f";
+        let braavos_class_hash = "0x03d16c7a9a60b0593bd202f660a28c5d76e0403601d9ccc7e4fa253b6a70c201";
+        let class_hash = accountid == "argentX" ? argent_class_hash : braavos_class_hash;
+
+        const { abi: typhoonAbi } = await provider.getClassAt(typhoonAddress);
+        new Contract(typhoonAbi, typhoonAddress, provider);
+
+        let curAddr = "0x";
+        let curBalance = 0n;
+        let accounts = [];
+        let curToken = "";
+        while (true) {
+            if (accountid == "argentX") {
+                curAddr = hash_exports.calculateContractAddressFromHash(
+                    curPubKey,
+                    class_hash,
+                    ["0", curPubKey, "1"],
+                    "0x0"
+                );
+            } else if (accountid == "braavos") {
+                curAddr = hash_exports.calculateContractAddressFromHash(
+                    curPubKey,
+                    class_hash,
+                    [curPubKey],
+                    "0x0"
+                );
+            }
+
+            try {
+                let anonClasshash = await provider.getClassHashAt(curAddr);
+                console.log("curAddr ", curAddr);
+                for (let i = 0; i < tokens.length; i++) {
+                    curToken = tokens[i];
+                    const { abi: tokenAbi } = await provider.getClassAt(tokens[i]);
+                    const token = new Contract(tokenAbi, tokens[i], provider);
+                    curBalance = await token.balanceOf(curAddr);
+                    if (curBalance > 0n) {
+                        accounts.push({
+                            "privKey": curPrivKey,
+                            "address": curAddr,
+                            [tokenToSymbol[curToken]]: curBalance
+                        });
+                    }
+                }
+            } catch (error) {
+                break;
+            }
+            curPrivKey = hash_exports.computePoseidonHash(BigInt(curPrivKey), BigInt('0x' + nextText));
+            curPubKey = ec_exports.starkCurve.getStarkKey(curPrivKey);
+        }
+        return accounts
     }
 }
 
@@ -27934,6 +28135,31 @@ function createAndDownloadFile(content, name = "note.txt") {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
+}
+
+async function generateProofCalldataForAnonymous(note, recipient, pubKey, privKey, classhash, accountid) {
+    let proof = await generateProofCalldata(note, recipient);
+
+    let sproof = proof.map(x => x.toString());
+    if (pubKey != undefined) {
+        if (accountid == "argentX") {
+            sproof.splice(1, 0, "23455079491982408");
+            sproof.splice(2, 0, "0");
+            sproof.splice(3, 0, pubKey);
+            sproof.splice(4, 0, classhash);
+        } else if (accountid == "braavos") {
+            let ha = hash_exports.computePoseidonHashOnElements(["0x03957f9f5a1cbfe918cedc2015c85200ca51a5f7506ecb6de98a5207b759bf8a", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0x534e5f4d41494e"]);
+            let sign = ec_exports.starkCurve.sign(ha, privKey);
+            sproof.splice(1, 0, "23455079491982408");
+            sproof.splice(2, 0, "1");
+            sproof.splice(3, 0, pubKey);
+            sproof.splice(4, 0, "0x03957f9f5a1cbfe918cedc2015c85200ca51a5f7506ecb6de98a5207b759bf8a");
+            sproof.splice(5, 0, "0x534e5f4d41494e");
+            sproof.splice(6, 0, sign.r);
+            sproof.splice(7, 0, sign.s);
+        }
+    }
+    return sproof
 }
 
 async function generateProofCalldata(note, recipient) {
@@ -28140,7 +28366,7 @@ function hashListH2(input, len) {
     return h;
 }
 
-debugger;
+
 async function getCandRl(leafs, addEvents, pool, block_number) {
 
     let C = [];
@@ -29473,4 +29699,4 @@ var _polyfillNode_url = /*#__PURE__*/Object.freeze({
     parse: urlParse
 });
 
-export { TyphoonSDK };
+export { TyphoonSDK, tokenToSymbol };
