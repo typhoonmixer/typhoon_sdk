@@ -4,7 +4,6 @@ import { AccountInterface } from "starknet";
 
 declare module "typhoon-sdk" {
 
-    
 
     export interface CallObject {
         contractAddress: string;
@@ -49,6 +48,8 @@ declare module "typhoon-sdk" {
         // store_notes_onchain(secrets: string[], nullifiers: string[], pools: string[], txhash: string): Promise<BigInt>
 
         withdraw(txHash: string, receiver_list: string[]): Promise<boolean>;
+
+        withdraw_to_anonymous_bot(pubkey: string, txHash: string): Promise<boolean>;
 
         withdraw_to_anonymous_account(txHash: string, lastAnonPrivKey: string, splited: boolean, address: string, accountid: string): Promise<boolean>;
 
