@@ -38,6 +38,8 @@ declare module "typhoon-sdk" {
 
         get_withdraw_calldata(txhash: string, receiver_list: string[]): any[];
 
+        get_typedMessage(): any;
+
         withdraw_fee_by_token(token_address: string): Promise<number>
 
         get_compliance_data(secret, nullifier, txhash, pool): Promise<ComplianceObject>
@@ -47,6 +49,10 @@ declare module "typhoon-sdk" {
         // store_notes_onchain(secrets: string[], nullifiers: string[], pools: string[], txhash: string): Promise<BigInt>
 
         withdraw(txHash: string, receiver_list: string[]): Promise<boolean>;
+
+        withdraw_to_anonymous_account(txHash: string, lastAnonPrivKey: string, splited: boolean, address: string, accountid: string): Promise<boolean>;
+
+        get_valid_anonymous_accounts(genPrivKey: string, address: string, accountid: string): Promise<any[]>;
 
         is_blacklisted(account_address: string): Promise<boolean>;
 
