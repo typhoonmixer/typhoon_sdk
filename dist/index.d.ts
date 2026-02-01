@@ -49,6 +49,8 @@ declare module "typhoon-sdk" {
 
         withdraw(txHash: string, receiver_list: string[]): Promise<boolean>;
 
+        is_typhoon_bot(address: string, starkscanApiKey: string): Promise<boolean>;
+
         withdraw_to_anonymous_bot(pubkey: string, txHash: string): Promise<boolean>;
 
         withdraw_to_anonymous_account(txHash: string, lastAnonPrivKey: string, splited: boolean, address: string, accountid: string): Promise<boolean>;
