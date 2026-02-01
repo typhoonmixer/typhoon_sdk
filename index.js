@@ -37,22 +37,22 @@ const typedMessage = {
 
 const tokens = [
     "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
-     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
-     "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
-     "0x0719b5092403233201aa822ce928bd4b551d0cdb071a724edd7dc5e5f57b7f34",
-     "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac",
-     "0x04daa17763b286d1e59b97c283c0b8c949994c361e426a28f743c67bdfe9a32f",
-     "0x00acc2fa3bb7f6a6726c14d9e142d51fe3984dbfa32b5907e1e76425177875e2"
+    "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+    "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8",
+    "0x0719b5092403233201aa822ce928bd4b551d0cdb071a724edd7dc5e5f57b7f34",
+    "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac",
+    "0x04daa17763b286d1e59b97c283c0b8c949994c361e426a28f743c67bdfe9a32f",
+    "0x00acc2fa3bb7f6a6726c14d9e142d51fe3984dbfa32b5907e1e76425177875e2"
 ]
 
 export const tokenToSymbol = {
-     "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d": "STRK",
-     "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7": "ETH",
-     "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8": "USDC",
-     "0x0719b5092403233201aa822ce928bd4b551d0cdb071a724edd7dc5e5f57b7f34": "UNO",
-     "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac": "WBTC",
-     "0x04daa17763b286d1e59b97c283c0b8c949994c361e426a28f743c67bdfe9a32f": "tBTC",
-     "0x00acc2fa3bb7f6a6726c14d9e142d51fe3984dbfa32b5907e1e76425177875e2": "SCHIZODIO"
+    "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d": "STRK",
+    "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7": "ETH",
+    "0x053c91253bc9682c04929ca02ed00b3e423f6710d2ee7e0d5ebb06f3ecf368a8": "USDC",
+    "0x0719b5092403233201aa822ce928bd4b551d0cdb071a724edd7dc5e5f57b7f34": "UNO",
+    "0x03fe2b97c1fd336e750087d68b9b867997fd64a2661ff3ca5a7c771641e8e7ac": "WBTC",
+    "0x04daa17763b286d1e59b97c283c0b8c949994c361e426a28f743c67bdfe9a32f": "tBTC",
+    "0x00acc2fa3bb7f6a6726c14d9e142d51fe3984dbfa32b5907e1e76425177875e2": "SCHIZODIO"
 }
 
 export class TyphoonSDK {
@@ -302,6 +302,59 @@ export class TyphoonSDK {
         return true
     }
 
+    async is_typhoon_bot(address, starkscanApiKey) {
+        const base = "https://api.starkscan.co"; // mainnet
+        const url = `${base}/api/v0/contracts/${address}`;
+
+        const res = await fetch(url, {
+            headers: {
+                accept: "application/json",
+                "x-api-key": starkscanApiKey,
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error(`StarkScan API error ${res.status}: ${await res.text()}`);
+        }
+
+        const data = await res.json();
+        // console.log("deployed_by_contract_address:", data.deployed_by_contract_address);
+        return data.deployed_by_contract_address == PAYMASTER_ADDR
+    }
+
+    async withdraw_to_anonymous_bot(pubkey, txHash) {
+        let class_hash = "0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f"
+        let addr = hash.calculateContractAddressFromHash(
+            pubkey,
+            class_hash,
+            ["0", pubkey, "1"],
+            "0x0"
+        )
+
+        for (let i = 0; i < this.secrets.length; i++) {
+            let note = { "secret": this.secrets[i].startsWith("0x") ? this.secrets[i].slice(2) : this.secrets[i], "nullifier": this.nullifiers[i].startsWith("0x") ? this.nullifiers[i].slice(2) : this.nullifiers[i], "pool": this.pools[i], "txHash": txHash }
+            let callData = []
+            if (i == 0) {
+                callData = await generateProofCalldataForAnonymousBot(note, addr, pubkey, class_hash)
+            } else {
+                callData = await generateProofCalldataForAnonymousBot(note, addr, undefined, class_hash)
+            }
+            let cd = callData.map(x => x.toString())
+            try {
+                const res = await axios.post("https://typhoon-paymaster.vercel.app/calldata", {
+                    calldata: cd,
+                    note_account_calldata: {}
+                });
+                console.log("Response:", res.data);
+
+            } catch (err) {
+                console.error("Error:", err.response?.data || err.message);
+                return false
+            }
+        }
+        return true
+    }
+
     async withdraw_to_anonymous_account(txhash, lastAnonPrivKey, splited, address, accountid) {
         let nextText = Array.from("next").map(char => char.charCodeAt(0).toString(16).padStart(2, '0')).join('')
         let receiverList = []
@@ -495,6 +548,18 @@ function createAndDownloadFile(content, name = "note.txt") {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
+}
+
+async function generateProofCalldataForAnonymousBot(note, recipient, pubKey, classhash) {
+    let proof = await generateProofCalldata(note, recipient)
+    let sproof = proof.map(x => x.toString())
+    if (pubkey != undefined) {
+        sproof.splice(1, 0, "23455079491982408")
+        sproof.splice(2, 0, "0")
+        sproof.splice(3, 0, pubKey)
+        sproof.splice(4, 0, classhash)
+    }
+    return sproof
 }
 
 async function generateProofCalldataForAnonymous(note, recipient, pubKey, privKey, classhash, accountid) {
