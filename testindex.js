@@ -22,7 +22,7 @@ let receiver = "0x03f2039a5c1742f8d90985eabaddf691090176511ebe9d3bcd042b1914918e
 
 const provider = new RpcProvider({ nodeUrl: "https://rpc.starknet-testnet.lava.build:443" });
 const accAddress = "0x014c78b080b3e8b9d56ea74f05acdd9de473894998319761619eec15d415fa0a"
-const argentPrivKey = "0x0356325d51ffbc99281a535907b6d865d10fa641937b6ff85026a5f87245690f"
+const argentPrivKey = ""
 const argentAddr = "0x04259a8f1F05fDA7F2365e1D629f9dBaE203685272bF87D8Ef8853eB2745fB30"
 const account = new Account(provider, argentAddr, argentPrivKey);
 const strkAddress = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d"
