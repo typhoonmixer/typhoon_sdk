@@ -282,7 +282,6 @@ export class TyphoonSDK {
     }
 
 
-
     async withdraw(txhash, receiver_list) {
         for (let i = 0; i < this.secrets.length; i++) {
             let note = { "secret": this.secrets[i], "nullifier": this.nullifiers[i], "pool": this.pools[i], "txHash": txhash }
@@ -364,9 +363,6 @@ export class TyphoonSDK {
                     "0x0"
                 )
             }
-            
-            console.log("curPubKey ", curPubKey)
-            console.log("addr ", addr)
             receiverList.push(addr)
         }
 
@@ -656,7 +652,7 @@ async function fetchLevel(block_number, level, lvFullIndex, pool) {
     let levelArr = []
     let ll = lvFullIndex % 4n
     for (let i = 0; i < Number(ll.toString()); i++) {
-        levelArr[i] = filteredEvents[(filteredEvents.length - 1) - i].value
+        levelArr[i] = filteredEvents[(filteredEvents.length - 2) - i].value
     }
     return levelArr
 }
@@ -767,7 +763,7 @@ async function getCandRl(leafs, addEvents, pool, block_number) {
             C[currentLevel][addEvents[i].lvFullIndex % 4n] = addEvents[i].value
             let filteredEvents = addEvents.filter(val => val.level == currentLevel && val.lvFullIndex < addEvents[i].lvFullIndex)
             let nonZeroIndex = addEvents[i].lvFullIndex
-            for (let j = filteredEvents.length - 1; j > 0; j--) {
+            for (let j = 0; j < filteredEvents.length; j++) {
                 C[currentLevel][filteredEvents[j].lvFullIndex % 4n] = filteredEvents[j].value
                 nonZeroIndex = filteredEvents[j].lvFullIndex
             }
